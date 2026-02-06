@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="AI-powered fire and smoke detection system using your camera"
+    />
+    <title>🔥 Fire Detection System | AI-Powered Safety</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <!-- Header -->
+    <header class="header">
+      <div class="logo">
+        <span class="logo-icon">🔥</span>
+        <span class="logo-text"
+          >FIRE<span class="logo-highlight">DETECT</span></span
+        >
+      </div>
+      <button class="settings-btn" id="settingsBtn">
+        <svg
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <circle cx="12" cy="12" r="3"></circle>
+          <path
+            d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
+          ></path>
+        </svg>
+      </button>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Camera Section -->
+      <section class="camera-section">
+        <div class="camera-container" id="cameraContainer">
+          <video id="videoFeed" autoplay playsinline muted></video>
+          <canvas id="detectionCanvas"></canvas>
+          <div class="camera-overlay" id="cameraOverlay">
+            <div class="camera-placeholder">
+              <svg
+                width="64"
+                height="64"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+              >
+                <path
+                  d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"
+                ></path>
+                <circle cx="12" cy="13" r="4"></circle>
+              </svg>
+              <p>Camera feed will appear here</p>
+              <span class="hint">Click "Start Detection" to begin</span>
+            </div>
+          </div>
+          <div class="detection-badge" id="detectionBadge">
+            <span class="badge-icon">🔥</span>
+            <span class="badge-text">FIRE DETECTED</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Status Panel -->
+      <section class="status-panel">
+        <!-- Status Card -->
+        <div class="status-card" id="statusCard">
+          <div class="status-header">
+            <span class="status-label">SYSTEM STATUS</span>
+            <span class="status-indicator" id="statusIndicator">
+              <span class="indicator-dot"></span>
+              <span class="indicator-text">IDLE</span>
+            </span>
+          </div>
+
+          <!-- Confidence Meter -->
+          <div class="confidence-section">
+            <div class="confidence-header">
+              <span>Detection Confidence</span>
+              <span class="confidence-value" id="confidenceValue">0%</span>
+            </div>
+            <div class="confidence-bar">
+              <div class="confidence-fill" id="confidenceFill"></div>
+            </div>
+          </div>
+
+          <!-- Detection Stats -->
+          <div class="stats-grid">
+            <div class="stat-item">
+              <span class="stat-icon">🔥</span>
+              <span class="stat-value" id="fireCount">0</span>
+              <span class="stat-label">Fire Alerts</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-icon">💨</span>
+              <span class="stat-value" id="smokeCount">0</span>
+              <span class="stat-label">Smoke Alerts</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="controls-card">
+          <button class="btn btn-primary" id="startBtn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+            Start Detection
+          </button>
+          <button class="btn btn-secondary" id="stopBtn" disabled>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="6" y="4" width="4" height="16"></rect>
+              <rect x="14" y="4" width="4" height="16"></rect>
+            </svg>
+            Stop
+          </button>
+          <button class="btn btn-danger" id="silenceBtn" disabled>
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+              <line x1="23" y1="9" x2="17" y2="15"></line>
+              <line x1="17" y1="9" x2="23" y2="15"></line>
+            </svg>
+            Silence Alarm
+          </button>
+        </div>
+
+        <!-- Sensitivity Control -->
+        <div class="sensitivity-card">
+          <div class="sensitivity-header">
+            <span>Detection Sensitivity</span>
+            <span class="sensitivity-value" id="sensitivityValue">Medium</span>
+          </div>
+          <input
+            type="range"
+            class="sensitivity-slider"
+            id="sensitivitySlider"
+            min="1"
+            max="3"
+            value="2"
+          />
+          <div class="sensitivity-labels">
+            <span>Low</span>
+            <span>Medium</span>
+            <span>High</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Alert History -->
+    <section class="history-section">
+      <div class="history-header">
+        <h2>
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          Alert History
+        </h2>
+        <button class="clear-btn" id="clearHistoryBtn">Clear All</button>
+      </div>
+      <div class="history-list" id="historyList">
+        <div class="history-empty">
+          <svg
+            width="48"
+            height="48"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1"
+          >
+            <path
+              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+            ></path>
+          </svg>
+          <p>No alerts yet</p>
+          <span>Detection events will appear here</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Settings Modal -->
+    <div class="modal-overlay" id="settingsModal">
+      <div class="modal">
+        <div class="modal-header">
+          <h3>Settings</h3>
+          <button class="modal-close" id="closeSettings">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="setting-item">
+            <label>
+              <input type="checkbox" id="soundEnabled" checked />
+              <span>Enable sound alerts</span>
+            </label>
+          </div>
+          <div class="setting-item">
+            <label>
+              <input type="checkbox" id="flashEnabled" checked />
+              <span>Enable screen flash</span>
+            </label>
+          </div>
+          <div class="setting-item">
+            <label for="cameraSelect">Camera Source</label>
+            <select id="cameraSelect">
+              <option value="environment">Back Camera</option>
+              <option value="user">Front Camera</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Alert Flash Overlay -->
+    <div class="alert-flash" id="alertFlash"></div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
+    <script src="js/camera.js"></script>
+    <script src="js/detector.js"></script>
+    <script src="js/alerts.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>
