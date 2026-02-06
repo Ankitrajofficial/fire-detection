@@ -1,6 +1,6 @@
 /**
  * Fire & Smoke Detector Module
- * Uses color analysis and pattern recognition for detection
+ * Uses simple color analysis for fire detection
  */
 class FireDetector {
     constructor() {
@@ -12,35 +12,23 @@ class FireDetector {
         this.frameHistory = [];
         this.maxHistoryFrames = 5;
         
-        // Detection thresholds - balanced for accuracy
+        // Simple thresholds
         this.thresholds = {
-            1: { fire: 0.45, smoke: 0.65, minPixels: 0.015 }, // Low - strict
-            2: { fire: 0.35, smoke: 0.55, minPixels: 0.010 }, // Medium - balanced
-            3: { fire: 0.25, smoke: 0.45, minPixels: 0.006 }  // High - sensitive
+            1: { fire: 0.35, smoke: 0.60, minPixels: 0.008 },
+            2: { fire: 0.25, smoke: 0.50, minPixels: 0.005 },
+            3: { fire: 0.15, smoke: 0.40, minPixels: 0.003 }
         };
         
-        // Consecutive frames to confirm detection
-        this.consecutiveFramesRequired = 4;
+        // Require consecutive frames before alert
+        this.consecutiveFramesRequired = 3;
         this.consecutiveFireFrames = 0;
         this.consecutiveSmokeFrames = 0;
 
-        // Fire color ranges - exclude skin/furniture but detect real flames
-        this.fireColors = {
-            hueMin: 0,
-            hueMax: 40,        // Red to orange
-            satMin: 65,        // Flames are vivid (skin is ~40-55%)
-            lightMin: 45,
-            lightMax: 98
-        };
-
-        // Smoke color characteristics - MUCH stricter
+        // Smoke: gray colors
         this.smokeColors = {
-            satMax: 12,      // Very low saturation (almost pure gray)
-            lightMin: 45,    // Not too dark
-            lightMax: 70,    // Not too bright (exclude white walls)
-            // Smoke typically has slight blue/gray tint
-            hueMin: 180,
-            hueMax: 260
+            satMax: 15,
+            lightMin: 40,
+            lightMax: 75
         };
 
         // Callbacks
@@ -48,37 +36,25 @@ class FireDetector {
         this.onConfidenceUpdate = null;
     }
 
-    /**
-     * Set detection sensitivity
-     * @param {number} level - 1 (Low), 2 (Medium), 3 (High)
-     */
     setSensitivity(level) {
         this.sensitivity = Math.max(1, Math.min(3, level));
     }
 
-    /**
-     * Start detection loop
-     * @param {CameraManager} camera
-     */
     start(camera) {
         this.isRunning = true;
         this.camera = camera;
         this.frameHistory = [];
+        this.consecutiveFireFrames = 0;
+        this.consecutiveSmokeFrames = 0;
         this.detect();
     }
 
-    /**
-     * Stop detection loop
-     */
     stop() {
         this.isRunning = false;
         this.frameHistory = [];
         this.clearOverlay();
     }
 
-    /**
-     * Main detection loop
-     */
     detect() {
         if (!this.isRunning) return;
 
@@ -87,15 +63,13 @@ class FireDetector {
         if (imageData) {
             const result = this.analyzeFrame(imageData);
             
-            // Update confidence callback
             if (this.onConfidenceUpdate) {
                 this.onConfidenceUpdate(result);
             }
 
-            // Check for detection with consecutive frame requirement
             const threshold = this.thresholds[this.sensitivity];
             
-            // Fire detection - require multiple consecutive frames
+            // Fire detection
             if (result.fireConfidence >= threshold.fire && result.firePixelRatio >= threshold.minPixels) {
                 this.consecutiveFireFrames++;
                 if (this.consecutiveFireFrames >= this.consecutiveFramesRequired) {
@@ -105,7 +79,7 @@ class FireDetector {
                 this.consecutiveFireFrames = Math.max(0, this.consecutiveFireFrames - 1);
             }
             
-            // Smoke detection - require more consecutive frames AND motion
+            // Smoke detection
             if (result.smokeConfidence >= threshold.smoke && 
                 result.smokePixelRatio >= threshold.minPixels &&
                 this.detectMotion()) {
@@ -117,58 +91,42 @@ class FireDetector {
                 this.consecutiveSmokeFrames = Math.max(0, this.consecutiveSmokeFrames - 1);
             }
 
-            // Draw detection overlay
             this.drawOverlay(result);
         }
 
-        // Continue loop at ~15 FPS
         requestAnimationFrame(() => {
             setTimeout(() => this.detect(), 66);
         });
     }
 
-    /**
-     * Analyze a single frame for fire and smoke
-     * @param {ImageData} imageData
-     * @returns {Object} Detection results
-     */
     analyzeFrame(imageData) {
         const data = imageData.data;
         const totalPixels = imageData.width * imageData.height;
         
         let firePixels = 0;
         let smokePixels = 0;
-        let fireIntensity = 0;
-        let smokeIntensity = 0;
-        
         const fireRegions = [];
         const smokeRegions = [];
 
-        // Sample every 4th pixel for performance
+        // Sample every 4th pixel
         for (let i = 0; i < data.length; i += 16) {
             const r = data[i];
             const g = data[i + 1];
             const b = data[i + 2];
             
-            const { h, s, l } = this.rgbToHsl(r, g, b);
-            
-            // Check for fire colors
-            if (this.isFireColor(h, s, l, r, g, b)) {
+            // SIMPLE FIRE CHECK: Bright red with low blue
+            if (this.isFireColor(r, g, b)) {
                 firePixels++;
-                fireIntensity += l;
-                
-                // Store region info
                 const pixelIndex = i / 4;
                 const x = (pixelIndex % imageData.width) * 4;
                 const y = Math.floor(pixelIndex / imageData.width) * 4;
-                fireRegions.push({ x, y, intensity: l });
+                fireRegions.push({ x, y, intensity: r });
             }
             
-            // Check for smoke colors
-            if (this.isSmokeColor(h, s, l)) {
+            // Smoke check
+            const { h, s, l } = this.rgbToHsl(r, g, b);
+            if (this.isSmokeColor(s, l)) {
                 smokePixels++;
-                smokeIntensity += (100 - s);
-                
                 const pixelIndex = i / 4;
                 const x = (pixelIndex % imageData.width) * 4;
                 const y = Math.floor(pixelIndex / imageData.width) * 4;
@@ -176,19 +134,15 @@ class FireDetector {
             }
         }
 
-        // Calculate confidence
-        let fireConfidence = fireRatio >= 0.02 ? Math.min(1, fireRatio * 7) : 0;
-        let smokeConfidence = smokeRatio >= 0.05 ? Math.min(1, smokeRatio * 5) : 0;
+        const sampledPixels = totalPixels / 4;
+        const fireRatio = firePixels / sampledPixels;
+        const smokeRatio = smokePixels / sampledPixels;
         
-        // Flickering bonus/penalty for fire
-        const flickerBonus = this.calculateFlickerBonus();
-        if (flickerBonus < 0.15) {
-            fireConfidence *= 0.5; // Reduce by 50% if no flickering (static object)
-        } else if (flickerBonus > 0.35) {
-            fireConfidence = Math.min(1, fireConfidence * 1.4); // Boost for strong flicker
-        }
+        // Simple confidence calculation
+        let fireConfidence = Math.min(1, fireRatio * 10);
+        let smokeConfidence = Math.min(1, smokeRatio * 6);
         
-        // Store frame for history
+        // Store for flickering analysis
         this.frameHistory.push({ fireRatio, smokeRatio, timestamp: Date.now() });
         if (this.frameHistory.length > this.maxHistoryFrames) {
             this.frameHistory.shift();
@@ -205,43 +159,33 @@ class FireDetector {
     }
 
     /**
-     * Check if pixel color matches fire characteristics
-     * Detects real flames while excluding skin tones and furniture
+     * SIMPLE fire color check
+     * Fire = Very bright red, much higher than green, blue is low
      */
-    isFireColor(h, s, l, r, g, b) {
-        // Fire must be in red-orange hue range
-        const isFireHue = (h >= this.fireColors.hueMin && h <= this.fireColors.hueMax) ||
-                          (h >= 350); // Wrap-around red
+    isFireColor(r, g, b) {
+        // Fire characteristics:
+        // 1. Red is BRIGHT (> 200)
+        // 2. Red is much higher than green (R - G > 50)
+        // 3. Blue is low (< 100)
+        // 4. NOT skin tone (skin has higher blue and smaller R-G gap)
         
-        // Good saturation (flames are vivid, skin/wood is muted)
-        const hasFireSaturation = s >= this.fireColors.satMin;
-        const hasFireLightness = l >= this.fireColors.lightMin && l <= this.fireColors.lightMax;
+        const isBrightRed = r > 200;
+        const redDominant = (r - g) > 50;
+        const lowBlue = b < 100;
         
-        // Red must be dominant
-        const isRedDominant = r > g && r > b;
+        // Skin tone exclusion: skin has B > 80 typically and smaller R-G gap
+        const notSkin = !((r - g) < 60 && b > 70 && g > 100);
         
-        // Red-Green difference: flames have R much higher than G
-        // Skin: R-G = 10-30, Flames: R-G = 40-100+
-        const redGreenDiff = r - g;
-        const isTrueFlame = redGreenDiff > 40;
-        
-        // Blue should be relatively low (flames have little blue)
-        const hasLowBlue = b < 120;
-        
-        // Require bright red channel
-        const hasBrightRed = r > 170;
-        
-        // EXCLUDE skin tones explicitly
-        // Skin RGB pattern: R:170-240, G:120-200, B:100-170 with small R-G diff
-        const isSkinTone = (r > 160 && r < 245 && 
-                           g > 110 && g < 210 && 
-                           b > 85 && b < 180 && 
-                           redGreenDiff < 50);
-        
-        // All conditions except skin exclusion
-        return isFireHue && hasFireSaturation && hasFireLightness && 
-               isRedDominant && isTrueFlame && hasLowBlue && 
-               hasBrightRed && !isSkinTone;
+        return isBrightRed && redDominant && lowBlue && notSkin;
+    }
+
+    /**
+     * Smoke = Low saturation gray
+     */
+    isSmokeColor(s, l) {
+        return s <= this.smokeColors.satMax && 
+               l >= this.smokeColors.lightMin && 
+               l <= this.smokeColors.lightMax;
     }
 
     /**
