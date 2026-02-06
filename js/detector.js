@@ -12,25 +12,24 @@ class FireDetector {
         this.frameHistory = [];
         this.maxHistoryFrames = 5;
         
-        // Detection thresholds - STRICT to avoid false positives on skin/furniture
+        // Detection thresholds - balanced for accuracy
         this.thresholds = {
-            1: { fire: 0.55, smoke: 0.70, minPixels: 0.025 }, // Low - very strict
-            2: { fire: 0.45, smoke: 0.60, minPixels: 0.018 }, // Medium - strict
-            3: { fire: 0.35, smoke: 0.50, minPixels: 0.012 }  // High - balanced
+            1: { fire: 0.45, smoke: 0.65, minPixels: 0.015 }, // Low - strict
+            2: { fire: 0.35, smoke: 0.55, minPixels: 0.010 }, // Medium - balanced
+            3: { fire: 0.25, smoke: 0.45, minPixels: 0.006 }  // High - sensitive
         };
         
-        // Require MORE consecutive frames to avoid false triggers
-        this.consecutiveFramesRequired = 5;
+        // Consecutive frames to confirm detection
+        this.consecutiveFramesRequired = 4;
         this.consecutiveFireFrames = 0;
         this.consecutiveSmokeFrames = 0;
 
-        // Fire color ranges - VERY STRICT to exclude skin and furniture
+        // Fire color ranges - exclude skin/furniture but detect real flames
         this.fireColors = {
-            // Only bright red-orange (NOT brown/tan/skin tones)
             hueMin: 0,
-            hueMax: 35,        // Narrow range for true flames
-            satMin: 80,        // Very high saturation (skin is ~40-60%)
-            lightMin: 50,      // Bright flames
+            hueMax: 40,        // Red to orange
+            satMin: 65,        // Flames are vivid (skin is ~40-55%)
+            lightMin: 45,
             lightMax: 98
         };
 
@@ -177,23 +176,16 @@ class FireDetector {
             }
         }
 
-        const sampledPixels = totalPixels / 4;
-        const fireRatio = firePixels / sampledPixels;
-        const smokeRatio = smokePixels / sampledPixels;
-        
-        // Calculate confidence - require MORE flame pixels to trigger
-        // Need at least 3% of frame to be bright flame-colored
-        let fireConfidence = fireRatio >= 0.03 ? Math.min(1, fireRatio * 6) : 0;
-        // Smoke needs at least 5% of frame and motion
+        // Calculate confidence
+        let fireConfidence = fireRatio >= 0.02 ? Math.min(1, fireRatio * 7) : 0;
         let smokeConfidence = smokeRatio >= 0.05 ? Math.min(1, smokeRatio * 5) : 0;
         
-        // REQUIRE flickering pattern for fire (flames flicker, static objects don't)
+        // Flickering bonus/penalty for fire
         const flickerBonus = this.calculateFlickerBonus();
-        // If no flickering detected, reduce fire confidence significantly
-        if (flickerBonus < 0.2) {
-            fireConfidence *= 0.3; // Reduce by 70% if no flickering
-        } else if (flickerBonus > 0.4) {
-            fireConfidence = Math.min(1, fireConfidence * 1.3); // Boost if strong flickering
+        if (flickerBonus < 0.15) {
+            fireConfidence *= 0.5; // Reduce by 50% if no flickering (static object)
+        } else if (flickerBonus > 0.35) {
+            fireConfidence = Math.min(1, fireConfidence * 1.4); // Boost for strong flicker
         }
         
         // Store frame for history
@@ -214,40 +206,42 @@ class FireDetector {
 
     /**
      * Check if pixel color matches fire characteristics
-     * STRICT: Excludes skin tones, furniture, and other warm-colored objects
+     * Detects real flames while excluding skin tones and furniture
      */
     isFireColor(h, s, l, r, g, b) {
         // Fire must be in red-orange hue range
         const isFireHue = (h >= this.fireColors.hueMin && h <= this.fireColors.hueMax) ||
                           (h >= 350); // Wrap-around red
         
-        // VERY high saturation required - excludes skin (~40-60%) and brown wood (~30-50%)
+        // Good saturation (flames are vivid, skin/wood is muted)
         const hasFireSaturation = s >= this.fireColors.satMin;
         const hasFireLightness = l >= this.fireColors.lightMin && l <= this.fireColors.lightMax;
         
-        // Red must be strongly dominant
+        // Red must be dominant
         const isRedDominant = r > g && r > b;
         
-        // STRICT: Red must be MUCH higher than green (excludes skin where R ≈ G-20)
-        // Flames: R is 50-100+ higher than G
-        // Skin: R is only 10-30 higher than G
+        // Red-Green difference: flames have R much higher than G
+        // Skin: R-G = 10-30, Flames: R-G = 40-100+
         const redGreenDiff = r - g;
-        const isTrueFlame = redGreenDiff > 60; // Flames have big R-G difference
+        const isTrueFlame = redGreenDiff > 40;
         
-        // Blue must be low (flames have very little blue, skin has more)
-        const hasLowBlue = b < 100 && b < g * 0.7;
+        // Blue should be relatively low (flames have little blue)
+        const hasLowBlue = b < 120;
         
-        // Require VERY bright red channel (flames are bright!)
-        const hasVeryBrightRed = r > 200;
+        // Require bright red channel
+        const hasBrightRed = r > 170;
         
-        // Exclude skin tones: skin has R:180-240, G:130-200, B:100-180
-        // Flames have R:220+, G:100-180, B:0-80
-        const notSkinTone = !(r > 160 && r < 245 && g > 120 && g < 210 && b > 90 && b < 190);
+        // EXCLUDE skin tones explicitly
+        // Skin RGB pattern: R:170-240, G:120-200, B:100-170 with small R-G diff
+        const isSkinTone = (r > 160 && r < 245 && 
+                           g > 110 && g < 210 && 
+                           b > 85 && b < 180 && 
+                           redGreenDiff < 50);
         
-        // All conditions must be met - very strict
+        // All conditions except skin exclusion
         return isFireHue && hasFireSaturation && hasFireLightness && 
                isRedDominant && isTrueFlame && hasLowBlue && 
-               hasVeryBrightRed && notSkinTone;
+               hasBrightRed && !isSkinTone;
     }
 
     /**
